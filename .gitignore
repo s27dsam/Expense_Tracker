@@ -1,0 +1,11 @@
+# Ignore the SQLite database
+finance_data.db
+*.db
+
+# Ignore Python artifacts
+__pycache__/
+*.pyc
+
+# Ignore virtual environment folders
+.venv/
+venv/
