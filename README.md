@@ -1,5 +1,4 @@
 # Expense Tracker
-
 A personal finance management application built with Streamlit that helps you track, categorize, and visualize your spending habits.
 
 ![Expense Tracker](https://img.shields.io/badge/App-Expense%20Tracker-blue)
@@ -8,7 +7,6 @@ A personal finance management application built with Streamlit that helps you tr
 ![License](https://img.shields.io/badge/License-MIT-yellow)
 
 ## Features
-
 - **CSV Import**: Upload bank statements in CSV format
 - **Automatic Transaction Categorization**: Uses a local LLM (Ollama) to automatically categorize transactions
 - **Manual Category Assignment**: Manually assign categories to transactions
@@ -16,54 +14,43 @@ A personal finance management application built with Streamlit that helps you tr
   - View your account balance trend
   - See spending breakdown with interactive Sankey diagrams
 - **Persistent Storage**: Data is stored in SQLite database for easy access
-
 ## Requirements
-
 - Python 3.8+
 - Dependencies:
   - streamlit
   - pandas
   - plotly
   - ollama
-
 ## Installation
-
 1. Clone this repository:
    ```bash
    git clone https://github.com/yourusername/expense-tracker.git
    cd expense-tracker
    ```
-
 2. Create and activate a virtual environment:
    ```bash
    python -m venv .venv
    source .venv/bin/activate  # On Windows: .venv\Scripts\activate
    ```
-
 3. Install dependencies:
    ```bash
    pip install -r requirements.txt
    ```
-
 4. Install Ollama (for local LLM categorization):
    - Follow the instructions at [Ollama's website](https://ollama.ai/download)
    - Make sure to pull the gemma:2b model:
      ```bash
      ollama pull gemma:2b
      ```
-
 ## Usage
-
 1. Start the application:
    ```bash
    streamlit run app.py
    ```
-
 2. Open your browser and navigate to:
    ```
    http://localhost:8501
    ```
-
 3. Upload a CSV file with your bank statement data
    - The CSV should have columns: Date, Description, Debit, Credit, Balance
 
