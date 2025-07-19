@@ -178,8 +178,6 @@ def main():
                 
                 # Display KPI metrics in a row
                 col1, col2, col3 = st.columns(3)
-
-
                 with col1:
                     st.metric(
                         label="Income vs. Spending", 
