@@ -49,13 +49,75 @@ class FinanceDataConnection(BaseConnection[sqlite3.Connection]):
                 VALUES (?, ?)
             """, (description, category))
 
-    def append_data(self, df: pd.DataFrame):
-        df.to_sql("transactions", self._instance, if_exists="append", index=False)
+    def append_data(self, df: pd.DataFrame) -> int:
+        # Get existing transactions
+        existing_data = self.get_all_data()
+        
+        # Count initial rows for reporting purposes
+        initial_count = len(df)
+        
+        # If no existing data, just append all
+        if existing_data.empty:
+            df.to_sql("transactions", self._instance, if_exists="append", index=False)
+            return initial_count
+        
+        # Convert date columns to string for comparison
+        if 'Date' in existing_data.columns and 'Date' in df.columns:
+            existing_data['Date'] = existing_data['Date'].astype(str)
+            df['Date'] = df['Date'].astype(str)
+        
+        # Create a composite key for identifying unique transactions
+        existing_data['composite_key'] = existing_data.apply(
+            lambda row: f"{row['Date']}_{row['Description']}_{row['Debit']}_{row['Credit']}", axis=1
+        )
+        
+        # Add composite key to new data
+        df['composite_key'] = df.apply(
+            lambda row: f"{row['Date']}_{row['Description']}_{row['Debit']}_{row['Credit']}", axis=1
+        )
+        
+        # Filter out rows that already exist
+        existing_keys = set(existing_data['composite_key'])
+        new_rows = df[~df['composite_key'].isin(existing_keys)]
+        
+        # Remove the temporary composite key column
+        new_rows = new_rows.drop(columns=['composite_key'])
+        
+        # Only add new unique transactions
+        if not new_rows.empty:
+            new_rows.to_sql("transactions", self._instance, if_exists="append", index=False)
+        
+        # Return number of new rows added
+        return len(new_rows)
 
 def main():
     st.title("Personal Finance Tracker")
 
     conn = st.connection("finance_db", type=FinanceDataConnection)
+    
+    # Add date filter in sidebar
+    st.sidebar.header("Date Filter")
+    
+    # Get all data first to determine date range
+    all_data = conn.get_all_data()
+    
+    # Default date range
+    default_start_date = None
+    default_end_date = None
+    
+    # If data exists, set default date range based on data
+    if not all_data.empty:
+        try:
+            all_data['Date'] = pd.to_datetime(all_data['Date'])
+            default_start_date = all_data['Date'].min().date()
+            default_end_date = all_data['Date'].max().date()
+        except Exception:
+            # If date conversion fails, use None (will be handled later)
+            pass
+    
+    # Date filters
+    start_date = st.sidebar.date_input("Start Date", value=default_start_date)
+    end_date = st.sidebar.date_input("End Date", value=default_end_date)
 
     uploaded_file = st.file_uploader("Upload your monthly bank statement (CSV)", type="csv")
 
@@ -67,22 +129,88 @@ def main():
                 df[col] = df[col].fillna(0)
                 df[col] = df[col].astype(str).str.replace(r'[$,]', '', regex=True).astype(float)
 
-            conn.append_data(df)
-            st.success("File uploaded and data stored successfully!")
+            new_rows_count = conn.append_data(df)
+            if new_rows_count == len(df):
+                st.success(f"File uploaded and all {new_rows_count} transactions stored successfully!")
+            else:
+                st.success(f"File uploaded! Added {new_rows_count} new unique transactions out of {len(df)} total.")
 
         except Exception as e:
             st.error(f"Error processing file: {e}")
 
-    st.header("Account Balance Trend")
     try:
         all_data = conn.get_all_data()
         if not all_data.empty:
             all_data['Date'] = pd.to_datetime(all_data['Date'])
-            all_data = all_data.sort_values(by="Date")
-            st.line_chart(all_data.rename(columns={"Date": "index"}).set_index("index")["Balance"])
+            
+            # Apply date filter
+            filtered_data = all_data
+            if start_date and end_date:
+                filtered_data = all_data[(all_data['Date'].dt.date >= start_date) & 
+                                         (all_data['Date'].dt.date <= end_date)]
+                st.info(f"Showing data from {start_date} to {end_date}")
+            
+            # Check if we have data after filtering
+            if filtered_data.empty:
+                st.warning("No data available for the selected date range.")
+            else:
+                filtered_data = filtered_data.sort_values(by="Date")
+                
+                # Calculate financial health KPIs
+                st.subheader("Financial Health Overview")
+                
+                # Calculate total income (credits excluding transfers)
+                income_data = filtered_data[filtered_data["Credit"] > 0]
+                income_data = income_data[income_data["Category"] != "Transfer"]
+                total_income = income_data["Credit"].sum()
+                
+                # Calculate total spending (debits excluding transfers and investments)
+                spending_data = filtered_data[filtered_data["Debit"] > 0]
+                spending_data = spending_data[~spending_data["Category"].isin(["Transfer", "Investing"])]
+                total_spending = spending_data["Debit"].sum()
+                
+                # Calculate investments (separate from regular spending)
+                investment_data = filtered_data[filtered_data["Category"] == "Investing"]
+                total_investments = investment_data["Debit"].sum()
+                
+                # Calculate net cashflow (income - spending, excluding investments)
+                net_cashflow = total_income - total_spending
+                
+                # Display KPI metrics in a row
+                col1, col2, col3 = st.columns(3)
+
+
+                with col1:
+                    st.metric(
+                        label="Income vs. Spending", 
+                        value=f"${net_cashflow:.2f}",
+                        delta=f"{'+' if net_cashflow > 0 else ''}{net_cashflow/total_income*100:.1f}% of Income" if total_income > 0 else "N/A",
+                        delta_color="normal" if net_cashflow >= 0 else "inverse"
+                    )
+                
+                with col2:
+                    st.metric(
+                        label="Total Spending", 
+                        value=f"${total_spending:.2f}",
+                        delta=f"{total_spending/total_income*100:.1f}% of Income" if total_income > 0 else "N/A",
+                        delta_color="inverse"
+                    )
+                
+                with col3:
+                    st.metric(
+                        label="Investments", 
+                        value=f"${total_investments:.2f}",
+                        delta=f"{total_investments/total_income*100:.1f}% of Income" if total_income > 0 else "N/A",
+                        delta_color="normal"
+                    )
+                
+                # Display account balance chart
+                st.header("Account Balance Trend")
+                st.line_chart(filtered_data.rename(columns={"Date": "index"}).set_index("index")["Balance"])
 
             st.header("Spending Breakdown")
-            spending_data = all_data[all_data["Debit"] > 0]
+            # Use filtered_data instead of all_data for spending analysis
+            spending_data = filtered_data[filtered_data["Debit"] > 0]
             excluded_categories = ["Transfer"]
             spending_data = spending_data[~spending_data["Category"].isin(excluded_categories)]
 
@@ -104,6 +232,33 @@ def main():
                         fig = go.Figure(data)
                         fig.update_layout(title_text="Sankey Diagram - Spending Breakdown", font_size=10)
                         st.plotly_chart(fig, use_container_width=True)
+                        
+                        # Add bar chart for category spending
+                        st.subheader("Category Spending Breakdown")
+                        
+                        # Sort by spending amount (descending)
+                        category_spending = category_spending.sort_values(by="Debit", ascending=False)
+                        
+                        # Create bar chart with Plotly for better customization
+                        bar_fig = go.Figure(data=[
+                            go.Bar(
+                                x=category_spending["Category"],
+                                y=category_spending["Debit"],
+                                text=category_spending["Debit"].apply(lambda x: f"${x:.2f}"),
+                                textposition="auto",
+                                marker_color="royalblue"
+                            )
+                        ])
+                        
+                        bar_fig.update_layout(
+                            title="Spending by Category",
+                            xaxis_title="Category",
+                            yaxis_title="Amount ($)",
+                            yaxis=dict(tickprefix="$"),
+                            height=500
+                        )
+                        
+                        st.plotly_chart(bar_fig, use_container_width=True)
                     else:
                         st.info("No spending data to display.")
             else:
@@ -117,7 +272,7 @@ def main():
             st.session_state.page = "categorize"
 
     if "page" in st.session_state and st.session_state.page == "categorize":
-            categorize_transactions_page(conn)
+            categorize_transactions_page(conn, start_date, end_date)
 
 
 def get_local_model_category(description: str) -> str:
@@ -158,7 +313,7 @@ def get_local_model_category(description: str) -> str:
     return "Other"
 
 
-def categorize_transactions_page(conn):
+def categorize_transactions_page(conn, start_date=None, end_date=None):
     st.header("Categorize Transactions")
 
     all_data = conn.get_all_data()
@@ -166,14 +321,28 @@ def categorize_transactions_page(conn):
     if all_data.empty:
         st.info("No transactions to categorize.")
         return
+        
+    # Convert date column to datetime
+    all_data['Date'] = pd.to_datetime(all_data['Date'])
+    
+    # Apply date filter if provided
+    filtered_data = all_data
+    if start_date and end_date:
+        filtered_data = all_data[(all_data['Date'].dt.date >= start_date) & 
+                               (all_data['Date'].dt.date <= end_date)]
+        st.info(f"Showing transactions from {start_date} to {end_date}")
+    
+    if filtered_data.empty:
+        st.warning("No data available for the selected date range.")
+        return
 
     # ✅ Filter out transactions already marked as 'Transfer'
-    data_to_categorize = all_data[all_data["Category"] != "Transfer"]
+    data_to_categorize = filtered_data[filtered_data["Category"] != "Transfer"]
 
     # Use the filtered dataframe to get descriptions
     unique_descriptions = data_to_categorize["Description"].unique()
 
-    if st.button("Run Local Model Categorization"):
+    if st.button("Run AI Model Categorization"):
         with st.spinner("Categorizing transactions..."):
             for description in unique_descriptions:
                 # Get current category from the filtered data
