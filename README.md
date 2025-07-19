@@ -17,7 +17,7 @@ A personal finance management application built with Streamlit that helps you tr
   - See spending breakdown with interactive Sankey diagrams
 - **Persistent Storage**: Data is stored in SQLite database for easy access
 
-## 📋 Requirements
+## Requirements
 
 - Python 3.8+
 - Dependencies:
@@ -26,7 +26,7 @@ A personal finance management application built with Streamlit that helps you tr
   - plotly
   - ollama
 
-## 🚀 Installation
+## Installation
 
 1. Clone this repository:
    ```bash
@@ -52,7 +52,7 @@ A personal finance management application built with Streamlit that helps you tr
      ollama pull gemma:2b
      ```
 
-## 💻 Usage
+## Usage
 
 1. Start the application:
    ```bash
@@ -73,7 +73,7 @@ A personal finance management application built with Streamlit that helps you tr
 
 5. View the visualizations of your spending patterns
 
-## 📊 Data Structure
+## Data Structure
 
 The application expects CSV files with the following columns:
 - `Date`: Transaction date (format: DD MMM YYYY)
@@ -82,7 +82,7 @@ The application expects CSV files with the following columns:
 - `Credit`: Amount deposited (positive number)
 - `Balance`: Account balance after the transaction
 
-## 🛠️ Technology Stack
+## Technology Stack
 
 - **Frontend & Backend**: Streamlit
 - **Data Processing**: Pandas
@@ -90,7 +90,7 @@ The application expects CSV files with the following columns:
 - **Database**: SQLite
 - **Transaction Categorization**: Ollama (Local LLM)
 
-## 🤝 Contributing
+## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
 
@@ -100,12 +100,7 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
 
-## 📝 License
+## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
 
-## 📞 Contact
-
-Your Name - [your.email@example.com](mailto:your.email@example.com)
-
-Project Link: [https://github.com/yourusername/expense-tracker](https://github.com/yourusername/expense-tracker)
